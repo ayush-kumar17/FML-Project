@@ -1,0 +1,2 @@
+dataset,features,C,margin,n_support,metrics
+breast_cancer,"[np.str_('mean radius'), np.str_('mean texture')]",10000.0,1.6418714775521168,90,"{'accuracy': 0.8713450292397661, 'precision': 0.8761061946902655, 'recall': 0.9252336448598131, 'f1': 0.9}"

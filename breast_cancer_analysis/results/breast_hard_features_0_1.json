@@ -1,0 +1,13 @@
+{
+  "dataset": "breast_cancer",
+  "features": [
+    "mean radius",
+    "mean texture"
+  ],
+  "infeasible": true,
+  "kernel_used": null,
+  "kernel_params": null,
+  "margin": null,
+  "n_support": null,
+  "metrics": null
+}

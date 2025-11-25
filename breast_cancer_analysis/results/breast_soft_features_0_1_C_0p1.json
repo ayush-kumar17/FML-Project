@@ -1,0 +1,16 @@
+{
+  "dataset": "breast_cancer",
+  "features": [
+    "mean radius",
+    "mean texture"
+  ],
+  "C": 0.1,
+  "margin": 3.072564090101153,
+  "n_support": 113,
+  "metrics": {
+    "accuracy": 0.8771929824561403,
+    "precision": 0.8771929824561403,
+    "recall": 0.9345794392523364,
+    "f1": 0.9049773755656109
+  }
+}

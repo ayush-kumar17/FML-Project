@@ -14,6 +14,8 @@ from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import LinearSVC
 
 # Ensure parent project dir on path
 PARENT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -47,58 +49,136 @@ def run_pairwise_hard(feature_idx=(0, 1), random_state=42):
     X = X_full[:, [fi0, fi1]]
     fname = f"{feature_names[fi0]}__{feature_names[fi1]}".replace(' ', '_')
 
-    X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3, random_state=random_state, stratify=y)
+    # Scale features for numerical stability and faster convergence
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
 
-    svc_hard = SVC(kernel='linear', C=1e10)
-    svc_hard.fit(X_tr, y_tr)
-    y_tr_pred = svc_hard.predict(X_tr)
+    # Use a fast LinearSVC pre-check
+    X_tr_check, X_te_check, y_tr_check, y_te_check = train_test_split(X, y, test_size=0.3, random_state=random_state, stratify=y)
+    fast_linear = LinearSVC(C=1e6, max_iter=20000, tol=1e-4, dual=False, random_state=random_state)
+    fast_linear.fit(X_tr_check, y_tr_check)
+    train_acc_fast = np.mean(fast_linear.predict(X_tr_check) == y_tr_check)
 
-    if np.mean(y_tr_pred == y_tr) < 1.0:
-        print('Linear hard-margin infeasible on training split -> trying kernels')
-        svc_hard = None
-        kernel_used = None
-        kernel_params = None
+    svc_hard = None
+    kernel_used = None
+    kernel_params = None
 
-        kernel_candidates = [
-            {'kernel': 'poly', 'degree': 2},
-            {'kernel': 'poly', 'degree': 3},
-            {'kernel': 'rbf', 'gamma': 'scale'}
-        ]
-
-        for cand in kernel_candidates:
-            if cand['kernel'] == 'poly':
-                svc_k = SVC(kernel='poly', degree=cand['degree'], C=1e10, gamma='scale')
-            else:
-                svc_k = SVC(kernel=cand['kernel'], C=1e10, gamma=cand.get('gamma', 'scale'))
-            svc_k.fit(X_tr, y_tr)
-            y_tr_pred_k = svc_k.predict(X_tr)
-            if np.mean(y_tr_pred_k == y_tr) == 1.0:
-                svc_hard = svc_k
-                kernel_used = cand['kernel']
-                kernel_params = cand
-                print(f'Separable with kernel {kernel_used} {kernel_params}')
-                break
-
-    if svc_hard is None:
-        infeasible = True
-        margin = None
-        sv = None
-        metrics = None
-        print('No kernel found that perfectly separates training split')
-    else:
+    if train_acc_fast == 1.0:
+        # Accept linear solution from LinearSVC (fast)
+        svc_hard = fast_linear
+        kernel_used = 'linear (LinearSVC)'
+        kernel_params = {}
         infeasible = False
-        if getattr(svc_hard, 'kernel', None) == 'linear':
-            margin = compute_margin_from_coef(svc_hard.coef_)
-        else:
-            margin = None
-        sv = len(svc_hard.support_)
-        y_pred = svc_hard.predict(X_te)
+        # compute margin (LinearSVC stores coef_)
+        margin = compute_margin_from_coef(fast_linear.coef_)
+        sv = None
+        y_pred = fast_linear.predict(X_te_check)
         metrics = {
-            'accuracy': float(accuracy_score(y_te, y_pred)),
-            'precision': float(precision_score(y_te, y_pred)),
-            'recall': float(recall_score(y_te, y_pred)),
-            'f1': float(f1_score(y_te, y_pred))
+            'accuracy': float(accuracy_score(y_te_check, y_pred)),
+            'precision': float(precision_score(y_te_check, y_pred)),
+            'recall': float(recall_score(y_te_check, y_pred)),
+            'f1': float(f1_score(y_te_check, y_pred))
         }
+        X_tr, X_te, y_tr, y_te = X_tr_check, X_te_check, y_tr_check, y_te_check
+    else:
+        # Fall back to bounded SVC attempts on scaled data
+        X_tr, X_te, y_tr, y_te = X_tr_check, X_te_check, y_tr_check, y_te_check
+        svc_hard = SVC(kernel='linear', C=1e6, tol=1e-3, max_iter=10000, cache_size=500)
+        svc_hard.fit(X_tr, y_tr)
+        y_tr_pred = svc_hard.predict(X_tr)
+        if np.mean(y_tr_pred == y_tr) < 1.0:
+            print('Linear hard-margin infeasible on training split -> trying bounded kernels')
+            svc_hard = None
+
+            kernel_candidates = [
+                {'kernel': 'poly', 'degree': 2, 'C': 1e4},
+                {'kernel': 'poly', 'degree': 3, 'C': 1e4},
+                {'kernel': 'rbf', 'gamma': 'scale', 'C': 1e4}
+            ]
+
+            # GPU SVM detection: try cuML (preferred), then ThunderSVM
+            GPU_AVAILABLE = False
+            USE_CUML = False
+            USE_THUNDERSVM = False
+            try:
+                from cuml.svm import SVC as cuSVC
+                import cupy as cp
+                GPU_AVAILABLE = True
+                USE_CUML = True
+                print('cuML GPU SVM detected: will use GPU for kernel SVM attempts')
+            except Exception:
+                try:
+                    from thundersvm import SVC as thSVC
+                    GPU_AVAILABLE = True
+                    USE_THUNDERSVM = True
+                    print('ThunderSVM detected: will use GPU for kernel SVM attempts')
+                except Exception:
+                    GPU_AVAILABLE = False
+
+            for cand in kernel_candidates:
+                # Prefer GPU implementations when available
+                if GPU_AVAILABLE and USE_CUML:
+                    # cuML requires float32 and cupy arrays
+                    try:
+                        X_tr_dev = cp.asarray(X_tr.astype('float32'))
+                        y_tr_dev = cp.asarray(y_tr.astype('int32'))
+                        if cand['kernel'] == 'poly':
+                            svc_k = cuSVC(kernel='poly', degree=cand['degree'], C=float(cand['C']), gamma='scale')
+                        else:
+                            svc_k = cuSVC(kernel=cand['kernel'], C=float(cand['C']), gamma=cand.get('gamma','scale'))
+                        svc_k.fit(X_tr_dev, y_tr_dev)
+                        y_tr_pred_k = cp.asnumpy(svc_k.predict(X_tr_dev)).astype(int)
+                    except Exception as e:
+                        # GPU attempt failed; fallback to CPU sklearn
+                        svc_k = None
+                        y_tr_pred_k = np.array([])
+                elif GPU_AVAILABLE and USE_THUNDERSVM:
+                    # Use ThunderSVM on CPU/GPU build (fits numpy arrays)
+                    try:
+                        svc_k = thSVC(kernel=cand['kernel'], C=cand.get('C', 1e4))
+                        svc_k.fit(X_tr.astype('float32'), y_tr.astype('int32'))
+                        y_tr_pred_k = svc_k.predict(X_tr).astype(int)
+                    except Exception:
+                        svc_k = None
+                        y_tr_pred_k = np.array([])
+                else:
+                    # CPU sklearn fallback with bounded settings
+                    if cand['kernel'] == 'poly':
+                        svc_k = SVC(kernel='poly', degree=cand['degree'], C=cand['C'], gamma='scale', tol=1e-3, max_iter=10000, cache_size=500)
+                    else:
+                        svc_k = SVC(kernel=cand['kernel'], C=cand['C'], gamma=cand.get('gamma','scale'), tol=1e-3, max_iter=10000, cache_size=500)
+                    svc_k.fit(X_tr, y_tr)
+                    y_tr_pred_k = svc_k.predict(X_tr)
+
+                if y_tr_pred_k.size and np.mean(y_tr_pred_k == y_tr) == 1.0:
+                    svc_hard = svc_k
+                    kernel_used = cand['kernel']
+                    kernel_params = cand
+                    print(f'Separable with kernel {kernel_used} {kernel_params}')
+                    break
+
+        if svc_hard is None:
+            infeasible = True
+            margin = None
+            sv = None
+            metrics = None
+            print('No kernel found that perfectly separates training split (bounded attempts)')
+        else:
+            infeasible = False
+            if getattr(svc_hard, 'kernel', None) == 'linear' and hasattr(svc_hard, 'coef_'):
+                margin = compute_margin_from_coef(svc_hard.coef_)
+            elif hasattr(svc_hard, 'coef_'):
+                margin = compute_margin_from_coef(svc_hard.coef_)
+            else:
+                margin = None
+            sv = len(svc_hard.support_)
+            y_pred = svc_hard.predict(X_te)
+            metrics = {
+                'accuracy': float(accuracy_score(y_te, y_pred)),
+                'precision': float(precision_score(y_te, y_pred)),
+                'recall': float(recall_score(y_te, y_pred)),
+                'f1': float(f1_score(y_te, y_pred))
+            }
 
     out = {
         'dataset': 'breast_cancer',
@@ -121,7 +201,19 @@ def run_pairwise_hard(feature_idx=(0, 1), random_state=42):
     out_png = os.path.join(RESULTS_DIR, f'breast_hard_features_{fi0}_{fi1}.png')
     fig, ax = plt.subplots(1, 1, figsize=(6,5))
     if not infeasible and svc_hard is not None:
-        SVMVisualizer.plot_decision_boundary(svc_hard, X_tr, y_tr, title=f'Hard ({kernel_used}) {fname}', ax=ax)
+        # If LinearSVC used, convert to SVC-like interface for plotting if needed
+        try:
+            SVMVisualizer.plot_decision_boundary(svc_hard, X_tr, y_tr, title=f'Hard ({kernel_used}) {fname}', ax=ax)
+        except Exception:
+            # fallback plotting for LinearSVC
+            xx, yy = np.meshgrid(np.linspace(X_tr[:,0].min()-1, X_tr[:,0].max()+1, 300),
+                                 np.linspace(X_tr[:,1].min()-1, X_tr[:,1].max()+1, 300))
+            grid = np.c_[xx.ravel(), yy.ravel()]
+            if hasattr(svc_hard, 'decision_function'):
+                Z = svc_hard.decision_function(grid).reshape(xx.shape)
+                ax.contour(xx, yy, Z, levels=[0], colors='k')
+            ax.scatter(X_tr[:,0], X_tr[:,1], c=y_tr, cmap='bwr', edgecolor='k')
+            ax.set_title(f'Hard ({kernel_used}) {fname}')
     else:
         ax.text(0.5, 0.5, 'Hard margin infeasible\n(no kernel found that perfectly separates)', ha='center', va='center')
         ax.set_xticks([])
