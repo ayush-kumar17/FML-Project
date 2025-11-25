@@ -313,7 +313,7 @@ class SVMVisualizer:
         table.set_fontsize(10)
         table.scale(1, 2)
         
-        # Color headers
+        # Color header
         for i in range(len(headers)):
             table[(0, i)].set_facecolor('#4CAF50')
             table[(0, i)].set_text_props(weight='bold', color='white')
