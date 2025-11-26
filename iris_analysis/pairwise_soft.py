@@ -24,6 +24,11 @@ from visualizations import SVMVisualizer
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), 'results')
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
+# Manual C value for soft-margin runs.
+# Edit SVM_C here or set environment variable SVM_C before running, for example:
+# SVM_C=0.5 python pairwise_soft.py
+SVM_C = 10000.0
+
 
 def load_iris(csv_path, features=('PetalLengthCm', 'PetalWidthCm')):
     df = pd.read_csv(csv_path)
@@ -96,4 +101,12 @@ def run_pairwise_soft(csv_path, C=1.0, features=('PetalLengthCm', 'PetalWidthCm'
 if __name__ == '__main__':
     csv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Iris.csv'))
     print('Running pairwise soft-margin analysis on', csv_path)
-    run_pairwise_soft(csv_path, C=1.0)
+    ev = os.environ.get('SVM_C')
+    if ev:
+        try:
+            c_val = float(ev)
+        except Exception:
+            c_val = SVM_C
+    else:
+        c_val = SVM_C
+    run_pairwise_soft(csv_path, C=c_val)
