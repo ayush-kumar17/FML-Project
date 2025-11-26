@@ -1,8 +1,3 @@
-"""
-Hard Margin SVM Implementation
-Works only with linearly separable data
-"""
-
 import numpy as np
 from sklearn.svm import SVC
 import warnings
@@ -10,16 +5,8 @@ warnings.filterwarnings('ignore')
 
 
 class HardMarginSVM:
-    """
-    Hard Margin SVM Classifier
-    Uses no slack variables - requires perfectly linearly separable data
-    """
-    
     def __init__(self):
-        """Initialize Hard Margin SVM"""
-        # Using sklearn's SVC with very large C approximates hard margin
-        # C -> infinity means no tolerance for errors
-        self.model = SVC(kernel='linear', C=1e10)  # Very large C for hard margin
+        self.model = SVC(kernel='linear', C=1e10) 
         self.support_vectors_ = None
         self.support_vector_indices_ = None
         self.n_support_ = None
@@ -27,28 +14,11 @@ class HardMarginSVM:
         self.intercept_ = None
         
     def fit(self, X, y):
-        """
-        Train the Hard Margin SVM
-        
-        Parameters:
-        -----------
-        X : array-like, shape (n_samples, n_features)
-            Training data
-        y : array-like, shape (n_samples,)
-            Target values (+1 or -1)
-            
-        Returns:
-        --------
-        self : object
-        """
         try:
-            # Convert labels to -1 and 1 if they're 0 and 1
             y_converted = np.where(y == 0, -1, y)
             
-            # Fit the model
             self.model.fit(X, y_converted)
             
-            # Store support vectors and parameters
             self.support_vectors_ = self.model.support_vectors_
             self.support_vector_indices_ = self.model.support_
             self.n_support_ = len(self.support_vectors_)
@@ -67,80 +37,20 @@ class HardMarginSVM:
         return self
     
     def predict(self, X):
-        """
-        Predict class labels for samples in X
-        
-        Parameters:
-        -----------
-        X : array-like, shape (n_samples, n_features)
-            Test data
-            
-        Returns:
-        --------
-        y_pred : array, shape (n_samples,)
-            Predicted class labels
-        """
         return self.model.predict(X)
     
     def decision_function(self, X):
-        """
-        Calculate decision function values
-        
-        Parameters:
-        -----------
-        X : array-like, shape (n_samples, n_features)
-            Test data
-            
-        Returns:
-        --------
-        decision : array, shape (n_samples,)
-            Decision function values
-        """
         return self.model.decision_function(X)
     
     def get_margin_width(self):
-        """
-        Calculate the margin width (2/||w||)
-        
-        Returns:
-        --------
-        margin : float
-            Width of the margin
-        """
         w_norm = np.linalg.norm(self.coef_)
         margin = 2.0 / w_norm
         return margin
     
     def get_hyperplane_params(self):
-        """
-        Get hyperplane parameters w and b
-        where the hyperplane is defined as w·x + b = 0
-        
-        Returns:
-        --------
-        w : array, shape (n_features,)
-            Normal vector to hyperplane
-        b : float
-            Intercept term
-        """
         return self.coef_[0], self.intercept_[0]
     
     def is_data_separable(self, X, y):
-        """
-        Check if data is linearly separable
-        
-        Parameters:
-        -----------
-        X : array-like, shape (n_samples, n_features)
-            Data to check
-        y : array-like, shape (n_samples,)
-            Labels
-            
-        Returns:
-        --------
-        separable : bool
-            True if data is linearly separable
-        """
         try:
             temp_model = SVC(kernel='linear', C=1e10)
             y_converted = np.where(y == 0, -1, y)
@@ -153,18 +63,11 @@ class HardMarginSVM:
 
 
 def demonstrate_hard_margin():
-    """
-    Demonstration of Hard Margin SVM
-    """
     print("=" * 60)
     print("HARD MARGIN SVM DEMONSTRATION")
     print("=" * 60)
-    
-    # Example 1: Linearly separable data
     print("\n1. Testing on Linearly Separable Data:")
     print("-" * 60)
-    
-    # Create simple linearly separable data
     X_sep = np.array([
         [1, 2], [2, 3], [2, 2], [3, 3],
         [6, 5], [7, 6], [6, 6], [7, 7]
@@ -181,7 +84,6 @@ def demonstrate_hard_margin():
     print(f"Margin width: {margin:.4f}")
     print(f"Support vectors:\n{svm.support_vectors_}")
     
-    # Example 2: Non-separable data (will fail)
     print("\n\n2. Testing on Non-Separable Data:")
     print("-" * 60)
     

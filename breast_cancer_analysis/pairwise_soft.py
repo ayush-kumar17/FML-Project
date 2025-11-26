@@ -1,8 +1,3 @@
-"""
-Pairwise Soft-Margin SVM analysis for Breast Cancer dataset
-Creates decision-boundary plots for chosen 2-feature projections and saves metrics.
-Outputs saved to drestcanceranalysis/results/
-"""
 import os
 import sys
 import json
@@ -14,12 +9,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-# Ensure parent project dir on path
 PARENT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
 
-# Optional visualizer from project
 try:
     from visualizations import SVMVisualizer
 except Exception:
@@ -28,9 +21,6 @@ except Exception:
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), 'results')
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-# Manual C value for the soft-margin study.
-# Edit this value to change the C used for a single run, or set environment variable
-# SVM_C to override before running the script (e.g. SVM_C=0.5 python pairwise_soft.py).
 SVM_C = 10000
 
 
@@ -43,13 +33,8 @@ def compute_margin_from_coef(coef):
 
 
 def run_pairwise_soft(feature_idx=(0, 1), C_values=None, random_state=42):
-    """Run linear soft-margin SVM for one or more C values and save per-C outputs plus a summary.
-
-    C_values may be a single float/int or an iterable of values. If None, a default grid is used.
-    """
     if C_values is None:
         C_values = [0.01, 0.1, 1.0, 10.0, 100.0]
-    # allow single numeric C to be passed
     if isinstance(C_values, (int, float)):
         C_values = [float(C_values)]
 
@@ -92,7 +77,6 @@ def run_pairwise_soft(feature_idx=(0, 1), C_values=None, random_state=42):
             'metrics': metrics
         }
 
-        # safe tag for filenames
         c_tag = str(C).replace('.', 'p')
         out_json = os.path.join(RESULTS_DIR, f'breast_soft_features_{fi0}_{fi1}_C_{c_tag}.json')
         with open(out_json, 'w') as f:
@@ -110,7 +94,6 @@ def run_pairwise_soft(feature_idx=(0, 1), C_values=None, random_state=42):
             except Exception:
                 pass
         else:
-            # fallback plotting
             xx, yy = np.meshgrid(np.linspace(X[:,0].min()-1, X[:,0].max()+1, 300),
                                  np.linspace(X[:,1].min()-1, X[:,1].max()+1, 300))
             grid = np.c_[xx.ravel(), yy.ravel()]
@@ -126,7 +109,6 @@ def run_pairwise_soft(feature_idx=(0, 1), C_values=None, random_state=42):
             plt.close()
 
         print('Saved:', out_json, out_csv, out_png)
-        # Append a flattened summary row
         summary.append({
             'C': float(C),
             'margin': margin,
@@ -137,7 +119,6 @@ def run_pairwise_soft(feature_idx=(0, 1), C_values=None, random_state=42):
             'f1': metrics['f1']
         })
 
-    # write summary files
     out_summary_json = os.path.join(RESULTS_DIR, f'breast_soft_features_{fi0}_{fi1}_C_study.json')
     with open(out_summary_json, 'w') as f:
         json.dump(summary, f, indent=2)
@@ -149,7 +130,6 @@ def run_pairwise_soft(feature_idx=(0, 1), C_values=None, random_state=42):
 
 
 if __name__ == '__main__':
-    # Allow overriding the single C value via environment variable SVM_C
     ev = os.environ.get('SVM_C')
     if ev:
         try:
@@ -158,5 +138,4 @@ if __name__ == '__main__':
             c_val = SVM_C
     else:
         c_val = SVM_C
-    # Run using the chosen single C value
     run_pairwise_soft(feature_idx=(0,1), C_values=c_val)

@@ -1,8 +1,3 @@
-"""
-Pairwise Soft-Margin SVM analysis for Iris dataset
-Creates per-pair decision-boundary plots and saves pairwise metrics (accuracy, precision, recall, f1), margins and support vector counts.
-Outputs saved to iris_analysis/results/
-"""
 import os
 import sys
 import json
@@ -14,7 +9,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-# Ensure parent project dir on path
 PARENT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
@@ -24,9 +18,6 @@ from visualizations import SVMVisualizer
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), 'results')
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-# Manual C value for soft-margin runs.
-# Edit SVM_C here or set environment variable SVM_C before running, for example:
-# SVM_C=0.5 python pairwise_soft.py
 SVM_C = 10000.0
 
 
@@ -73,7 +64,6 @@ def run_pairwise_soft(csv_path, C=1.0, features=('PetalLengthCm', 'PetalWidthCm'
             'f1': float(f1_score(y_te, y_pred, zero_division=0))
         }
 
-        # Plot
         fig, ax = plt.subplots(1, 1, figsize=(6, 5))
         SVMVisualizer.plot_decision_boundary(model, X_pair, y_bin, title=f'Soft Margin C={C} - {a} vs {b}', ax=ax)
         path = os.path.join(RESULTS_DIR, f'soft_pair_{a}_vs_{b}_C_{C}.png')

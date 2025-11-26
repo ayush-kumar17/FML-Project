@@ -1,8 +1,3 @@
-"""
-Visualization Module for SVM Project
-Creates all plots and visualizations for comparing Hard and Soft Margin SVMs
-"""
-
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
@@ -10,61 +5,32 @@ import seaborn as sns
 
 
 class SVMVisualizer:
-    """Visualization tools for SVM analysis"""
     
     @staticmethod
     def plot_decision_boundary(model, X, y, title="SVM Decision Boundary", 
                                ax=None, show_margin=True):
-        """
-        Plot decision boundary with margin and support vectors
-        
-        Parameters:
-        -----------
-        model : SVM model object
-            Trained SVM model
-        X : array, shape (n_samples, 2)
-            Feature matrix
-        y : array, shape (n_samples,)
-            Labels
-        title : str
-            Plot title
-        ax : matplotlib axis
-            Axis to plot on
-        show_margin : bool
-            Whether to show margin boundaries
-        """
         if ax is None:
             fig, ax = plt.subplots(figsize=(10, 8))
-        
-        # Create mesh for decision boundary
         x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
         y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
         xx, yy = np.meshgrid(np.linspace(x_min, x_max, 200),
                              np.linspace(y_min, y_max, 200))
-        
-        # Get decision function values
         Z = model.decision_function(np.c_[xx.ravel(), yy.ravel()])
         Z = Z.reshape(xx.shape)
-        
-        # Plot decision boundary and margins
         ax.contour(xx, yy, Z, levels=[0], linewidths=2, colors='black', 
                   linestyles='solid', label='Decision Boundary')
-        
         if show_margin:
             ax.contour(xx, yy, Z, levels=[-1, 1], linewidths=2, 
                       colors='black', linestyles='dashed', alpha=0.5)
-        
-        # Plot filled contours for regions
+
         ax.contourf(xx, yy, Z, levels=[-np.inf, 0, np.inf], 
                    colors=['lightblue', 'lightcoral'], alpha=0.3)
-        
-        # Plot data points
+
         ax.scatter(X[y == 0, 0], X[y == 0, 1], c='blue', s=50, 
                   edgecolors='k', label='Class 0', alpha=0.7)
         ax.scatter(X[y == 1, 0], X[y == 1, 1], c='red', s=50, 
                   edgecolors='k', label='Class 1', alpha=0.7)
         
-        # Highlight support vectors
         if hasattr(model, 'support_vectors_'):
             ax.scatter(model.support_vectors_[:, 0], 
                       model.support_vectors_[:, 1],
@@ -76,31 +42,14 @@ class SVMVisualizer:
         ax.set_title(title, fontsize=14, fontweight='bold')
         ax.legend(loc='best')
         ax.grid(True, alpha=0.3)
-        
+
         return ax
     
     @staticmethod
     def compare_hard_soft_margin(hard_model, soft_model, X, y, 
                                  dataset_name="Dataset"):
-        """
-        Side-by-side comparison of Hard and Soft Margin SVM
-        
-        Parameters:
-        -----------
-        hard_model : HardMarginSVM or None
-            Trained Hard Margin SVM (None if failed)
-        soft_model : SoftMarginSVM
-            Trained Soft Margin SVM
-        X : array
-            Feature matrix
-        y : array
-            Labels
-        dataset_name : str
-            Name of dataset
-        """
         fig, axes = plt.subplots(1, 2, figsize=(16, 6))
         
-        # Plot Hard Margin (if available)
         if hard_model is not None:
             SVMVisualizer.plot_decision_boundary(
                 hard_model, X, y, 
@@ -123,7 +72,6 @@ class SVMVisualizer:
             axes[0].scatter(X[y == 1, 0], X[y == 1, 1], c='red', s=50, alpha=0.5)
             axes[0].set_title(f"Hard Margin SVM\n{dataset_name}", fontweight='bold')
         
-        # Plot Soft Margin
         SVMVisualizer.plot_decision_boundary(
             soft_model, X, y,
             title=f"Soft Margin SVM (C={soft_model.C})\n{dataset_name}",
@@ -145,20 +93,6 @@ class SVMVisualizer:
     
     @staticmethod
     def plot_C_parameter_effect(X, y, C_values, dataset_name="Dataset"):
-        """
-        Show effect of different C values on Soft Margin SVM
-        
-        Parameters:
-        -----------
-        X : array
-            Feature matrix
-        y : array
-            Labels
-        C_values : list
-            List of C values to test
-        dataset_name : str
-            Name of dataset
-        """
         from soft_margin_svm import SoftMarginSVM
         
         n_plots = len(C_values)
@@ -174,18 +108,13 @@ class SVMVisualizer:
             if idx < len(axes):
                 ax = axes[idx]
                 
-                # Train model
                 model = SoftMarginSVM(C=C)
                 model.fit(X, y)
-                
-                # Plot
                 SVMVisualizer.plot_decision_boundary(
                     model, X, y,
                     title=f"C = {C}",
                     ax=ax
                 )
-                
-                # Add info
                 margin = model.get_margin_width()
                 misclass = model.get_misclassified_count(X, y)
                 
@@ -202,8 +131,7 @@ class SVMVisualizer:
                     'n_support': model.n_support_,
                     'errors': misclass
                 })
-        
-        # Hide unused subplots
+    
         for idx in range(n_plots, len(axes)):
             axes[idx].axis('off')
         
@@ -219,18 +147,6 @@ class SVMVisualizer:
     
     @staticmethod
     def plot_support_vectors_analysis(X, y, C_values):
-        """
-        Analyze how number of support vectors changes with C
-        
-        Parameters:
-        -----------
-        X : array
-            Feature matrix
-        y : array
-            Labels
-        C_values : list
-            List of C values to test
-        """
         from soft_margin_svm import SoftMarginSVM
         
         sv_counts = []
@@ -246,7 +162,6 @@ class SVMVisualizer:
         
         fig, axes = plt.subplots(1, 3, figsize=(15, 4))
         
-        # Support vectors vs C
         axes[0].plot(C_values, sv_counts, 'o-', linewidth=2, markersize=8)
         axes[0].set_xlabel('C (log scale)', fontsize=12)
         axes[0].set_ylabel('Number of Support Vectors', fontsize=12)
@@ -254,7 +169,6 @@ class SVMVisualizer:
         axes[0].set_xscale('log')
         axes[0].grid(True, alpha=0.3)
         
-        # Margin width vs C
         axes[1].plot(C_values, margins, 'o-', linewidth=2, markersize=8, color='green')
         axes[1].set_xlabel('C (log scale)', fontsize=12)
         axes[1].set_ylabel('Margin Width', fontsize=12)
@@ -262,7 +176,6 @@ class SVMVisualizer:
         axes[1].set_xscale('log')
         axes[1].grid(True, alpha=0.3)
         
-        # Errors vs C
         axes[2].plot(C_values, errors, 'o-', linewidth=2, markersize=8, color='red')
         axes[2].set_xlabel('C (log scale)', fontsize=12)
         axes[2].set_ylabel('Misclassified Samples', fontsize=12)
@@ -277,19 +190,10 @@ class SVMVisualizer:
     
     @staticmethod
     def create_summary_comparison_table(results_dict):
-        """
-        Create visual comparison table
-        
-        Parameters:
-        -----------
-        results_dict : dict
-            Dictionary with results for each dataset
-        """
         fig, ax = plt.subplots(figsize=(12, 6))
         ax.axis('tight')
         ax.axis('off')
         
-        # Prepare data
         headers = ['Dataset', 'Model', 'Margin Width', 'Support Vectors', 'Errors', 'Status']
         table_data = []
         
@@ -313,12 +217,10 @@ class SVMVisualizer:
         table.set_fontsize(10)
         table.scale(1, 2)
         
-        # Color header
         for i in range(len(headers)):
             table[(0, i)].set_facecolor('#4CAF50')
             table[(0, i)].set_text_props(weight='bold', color='white')
         
-        # Color rows alternately
         for i in range(1, len(table_data) + 1):
             for j in range(len(headers)):
                 if i % 2 == 0:

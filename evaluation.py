@@ -1,8 +1,3 @@
-"""
-Evaluation Module for SVM Project
-Calculates performance metrics and creates comparison reports
-"""
-
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import confusion_matrix, classification_report
@@ -12,40 +7,15 @@ import pandas as pd
 
 
 class SVMEvaluator:
-    """Evaluation tools for SVM models"""
     
     @staticmethod
     def evaluate_model(model, X_train, y_train, X_test, y_test):
-        """
-        Comprehensive evaluation of a single SVM model
-        
-        Parameters:
-        -----------
-        model : SVM model
-            Trained SVM model
-        X_train : array
-            Training features
-        y_train : array
-            Training labels
-        X_test : array
-            Test features
-        y_test : array
-            Test labels
-            
-        Returns:
-        --------
-        metrics : dict
-            Dictionary containing all evaluation metrics
-        """
-        # Convert labels if needed
         y_train_conv = np.where(y_train == 0, -1, y_train)
         y_test_conv = np.where(y_test == 0, -1, y_test)
         
-        # Predictions
         y_train_pred = model.predict(X_train)
         y_test_pred = model.predict(X_test)
-        
-        # Calculate metrics
+
         metrics = {
             'train_accuracy': accuracy_score(y_train_conv, y_train_pred),
             'test_accuracy': accuracy_score(y_test_conv, y_test_pred),
@@ -59,7 +29,6 @@ class SVMEvaluator:
             'margin_width': model.get_margin_width()
         }
         
-        # Confusion matrix
         metrics['confusion_matrix_train'] = confusion_matrix(y_train_conv, y_train_pred)
         metrics['confusion_matrix_test'] = confusion_matrix(y_test_conv, y_test_pred)
         
@@ -67,28 +36,8 @@ class SVMEvaluator:
     
     @staticmethod
     def compare_models(hard_model, soft_model, X_train, y_train, X_test, y_test):
-        """
-        Compare Hard Margin and Soft Margin SVM
-        
-        Parameters:
-        -----------
-        hard_model : HardMarginSVM or None
-            Trained Hard Margin model (None if failed)
-        soft_model : SoftMarginSVM
-            Trained Soft Margin model
-        X_train, y_train : arrays
-            Training data
-        X_test, y_test : arrays
-            Test data
-            
-        Returns:
-        --------
-        comparison : dict
-            Comparison results
-        """
         results = {}
         
-        # Evaluate Hard Margin (if available)
         if hard_model is not None:
             try:
                 results['hard_margin'] = SVMEvaluator.evaluate_model(
@@ -105,7 +54,6 @@ class SVMEvaluator:
                 'status': 'Not Applicable (Data not separable)'
             }
         
-        # Evaluate Soft Margin
         try:
             results['soft_margin'] = SVMEvaluator.evaluate_model(
                 soft_model, X_train, y_train, X_test, y_test
@@ -122,16 +70,6 @@ class SVMEvaluator:
     
     @staticmethod
     def print_evaluation_report(metrics, model_name="SVM"):
-        """
-        Print detailed evaluation report
-        
-        Parameters:
-        -----------
-        metrics : dict
-            Metrics dictionary from evaluate_model
-        model_name : str
-            Name of the model
-        """
         print("=" * 70)
         print(f"{model_name} EVALUATION REPORT")
         print("=" * 70)
@@ -163,19 +101,10 @@ class SVMEvaluator:
     
     @staticmethod
     def print_comparison_report(comparison_results):
-        """
-        Print comparison between Hard and Soft Margin
-        
-        Parameters:
-        -----------
-        comparison_results : dict
-            Results from compare_models
-        """
         print("\n" + "=" * 80)
         print("HARD MARGIN vs SOFT MARGIN SVM - COMPARISON")
         print("=" * 80)
         
-        # Extract metrics
         hard = comparison_results.get('hard_margin', {})
         soft = comparison_results.get('soft_margin', {})
         
@@ -211,27 +140,6 @@ class SVMEvaluator:
     
     @staticmethod
     def measure_training_time(model_class, X, y, **kwargs):
-        """
-        Measure training time for a model
-        
-        Parameters:
-        -----------
-        model_class : class
-            SVM model class
-        X : array
-            Features
-        y : array
-            Labels
-        **kwargs : dict
-            Additional parameters for model initialization
-            
-        Returns:
-        --------
-        training_time : float
-            Time taken to train in seconds
-        model : object
-            Trained model
-        """
         model = model_class(**kwargs)
         
         start_time = time.time()
@@ -244,19 +152,6 @@ class SVMEvaluator:
     
     @staticmethod
     def create_comparison_dataframe(results_list):
-        """
-        Create pandas DataFrame for easy comparison
-        
-        Parameters:
-        -----------
-        results_list : list of dict
-            List of result dictionaries
-            
-        Returns:
-        --------
-        df : pandas.DataFrame
-            Comparison dataframe
-        """
         data = []
         
         for result in results_list:
@@ -278,27 +173,6 @@ class SVMEvaluator:
     
     @staticmethod
     def analyze_C_parameter_impact(X, y, C_values, test_size=0.3, random_state=42):
-        """
-        Analyze impact of different C values
-        
-        Parameters:
-        -----------
-        X : array
-            Features
-        y : array
-            Labels
-        C_values : list
-            List of C values to test
-        test_size : float
-            Test set proportion
-        random_state : int
-            Random seed
-            
-        Returns:
-        --------
-        results : list
-            Results for each C value
-        """
         from soft_margin_svm import SoftMarginSVM
         
         X_train, X_test, y_train, y_test = train_test_split(
@@ -314,17 +188,14 @@ class SVMEvaluator:
         for C in C_values:
             print(f"\nTesting C = {C}...")
             
-            # Train model
             training_time, model = SVMEvaluator.measure_training_time(
                 SoftMarginSVM, X_train, y_train, C=C
             )
             
-            # Evaluate
             metrics = SVMEvaluator.evaluate_model(
                 model, X_train, y_train, X_test, y_test
             )
             
-            # Store results
             result = {
                 'C': C,
                 'training_time': training_time,
@@ -338,7 +209,6 @@ class SVMEvaluator:
         
         print("\n" + "=" * 70)
         
-        # Print summary table
         print("\nSUMMARY TABLE:")
         print("-" * 70)
         print(f"{'C':<10} {'Accuracy':<12} {'F1-Score':<12} {'SV Count':<12} {'Time (s)':<12}")

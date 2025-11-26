@@ -1,9 +1,3 @@
-"""
-Pairwise Hard-Margin SVM analysis for Iris dataset
-Attempts strict hard-margin by accepting a linear SVM only if training split is perfectly separable.
-Creates per-pair plots and saves pairwise metrics (accuracy, precision, recall, f1), margins and support vector counts.
-Outputs saved to iris_analysis/results/
-"""
 import os
 import sys
 import json
@@ -15,7 +9,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-# Ensure parent project dir on path
 PARENT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
@@ -56,7 +49,6 @@ def run_pairwise_hard(csv_path, features=('PetalLengthCm', 'PetalWidthCm')):
 
         X_tr, X_te, y_tr, y_te = train_test_split(X_pair, y_bin, test_size=0.3, random_state=42, stratify=y_bin)
 
-        # Try strict linear hard-margin first
         svc_hard = SVC(kernel='linear', C=1e10)
         svc_hard.fit(X_tr, y_tr)
         y_tr_pred = svc_hard.predict(X_tr)
@@ -64,13 +56,11 @@ def run_pairwise_hard(csv_path, features=('PetalLengthCm', 'PetalWidthCm')):
         kernel_params = {}
 
         if np.mean(y_tr_pred == y_tr) < 1.0:
-            # Linear infeasible; try kernel tricks
             print(f'Pair {a}_vs_{b}: linear hard-margin infeasible on training split -> trying kernel tricks')
             svc_hard = None
             kernel_used = None
             kernel_params = None
 
-            # Candidate kernels to try (poly degree 2, poly degree 3, rbf)
             kernel_candidates = [
                 {'kernel': 'poly', 'degree': 2},
                 {'kernel': 'poly', 'degree': 3},
@@ -86,7 +76,6 @@ def run_pairwise_hard(csv_path, features=('PetalLengthCm', 'PetalWidthCm')):
                 svc_k.fit(X_tr, y_tr)
                 y_tr_pred_k = svc_k.predict(X_tr)
                 if np.mean(y_tr_pred_k == y_tr) == 1.0:
-                    # Found a kernel that separates training data
                     svc_hard = svc_k
                     kernel_used = cand['kernel']
                     kernel_params = {k: v for k, v in cand.items()}
@@ -94,7 +83,6 @@ def run_pairwise_hard(csv_path, features=('PetalLengthCm', 'PetalWidthCm')):
                     break
 
             if svc_hard is None:
-                # No kernel achieved perfect separability on training split
                 infeasible = True
                 margin = None
                 sv = None
@@ -102,7 +90,6 @@ def run_pairwise_hard(csv_path, features=('PetalLengthCm', 'PetalWidthCm')):
                 print(f'Pair {a}_vs_{b}: no kernel found that yields perfect separability on training split')
             else:
                 infeasible = False
-                # For kernel models (non-linear), margin in input space isn't defined via coef_, so set margin=None
                 if getattr(svc_hard, 'kernel', None) == 'linear':
                     margin = compute_margin_from_coef(svc_hard.coef_)
                 else:
@@ -116,7 +103,6 @@ def run_pairwise_hard(csv_path, features=('PetalLengthCm', 'PetalWidthCm')):
                     'f1': float(f1_score(y_te, y_pred, zero_division=0))
                 }
         else:
-            # Linear hard-margin accepted
             infeasible = False
             margin = compute_margin_from_coef(svc_hard.coef_)
             sv = len(svc_hard.support_)
@@ -130,10 +116,8 @@ def run_pairwise_hard(csv_path, features=('PetalLengthCm', 'PetalWidthCm')):
             kernel_used = 'linear'
             kernel_params = {}
 
-        # For visualization, show only the accepted hard model decision boundary (linear or kernel)
         fig, ax = plt.subplots(1, 1, figsize=(6,5))
         if not infeasible and svc_hard is not None:
-            # plot accepted hard model (could be kernel)
             SVMVisualizer.plot_decision_boundary(svc_hard, X_pair, y_bin, title=f'Hard ({kernel_used}) {a} vs {b}', ax=ax)
         else:
             ax.text(0.5, 0.5, 'Hard margin infeasible\n(no kernel found that perfectly separates)', ha='center', va='center', wrap=True)

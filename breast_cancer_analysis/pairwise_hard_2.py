@@ -1,15 +1,3 @@
-"""
-pairwise_hard_2.py
-
-Hard-margin SVM in higher dimensions (default: first 30 features of breast_cancer).
-Behavior:
-- Scales features with StandardScaler
-- Uses a fast LinearSVC pre-check with very large C to detect perfect linear separability
-- If separable, saves metrics, margin and a PCA projection plot
-- By default avoids expensive kernel attempts in high-dim space. Set environment
-  TRY_KERNELS=1 to allow bounded kernel attempts (with conservative params).
-- Results (JSON/CSV/PNG) saved to results/ next to this file.
-"""
 import os
 import sys
 import json
@@ -46,14 +34,11 @@ def run_pairwise_hard_30d(n_features=30, try_kernels=False, random_state=42):
     used_feature_names = feature_names[:n_features]
     tag = f'{n_features}d_first'
 
-    # scale
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
 
-    # train/test split
     X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3, random_state=random_state, stratify=y)
 
-    # fast linear separability check
     fast_linear = LinearSVC(C=1e6, max_iter=20000, tol=1e-4, dual=False, random_state=random_state)
     fast_linear.fit(X_tr, y_tr)
     train_acc = float(np.mean(fast_linear.predict(X_tr) == y_tr))
@@ -85,7 +70,6 @@ def run_pairwise_hard_30d(n_features=30, try_kernels=False, random_state=42):
         print('Not linearly separable on training split (fast LinearSVC).')
         if try_kernels:
             print('try_kernels requested: performing conservative bounded kernel attempts (may be slow)')
-            # conservative kernel candidates for high-dim
             kernel_candidates = [
                 {'kernel': 'rbf', 'C': 100.0, 'gamma': 'scale'},
                 {'kernel': 'poly', 'C': 100.0, 'degree': 2, 'gamma': 'scale'}
@@ -139,24 +123,18 @@ def run_pairwise_hard_30d(n_features=30, try_kernels=False, random_state=42):
     out_csv = os.path.join(RESULTS_DIR, f'breast_hard_{tag}.csv')
     pd.DataFrame([out]).to_csv(out_csv, index=False)
 
-    # plotting: for >2D produce PCA projection and hyperplane contour + weight bars + distance histogram
-    # PCA projection + hyperplane contour (if model gives decision function or linear coef)
     try:
         from sklearn.decomposition import PCA
         pca = PCA(n_components=2)
         Xp = pca.fit_transform(X_tr)
 
-        # build grid in PCA space
         x_min, x_max = Xp[:,0].min() - 1, Xp[:,0].max() + 1
         y_min, y_max = Xp[:,1].min() - 1, Xp[:,1].max() + 1
         xx, yy = np.meshgrid(np.linspace(x_min, x_max, 200), np.linspace(y_min, y_max, 200))
         grid_pca = np.c_[xx.ravel(), yy.ravel()]
-        # map grid points back to original feature space
         grid_orig = pca.inverse_transform(grid_pca)
 
-        # compute decision values on original space
         if svc_model is not None and hasattr(svc_model, 'coef_'):
-            # linear model: use w and b for fast evaluation
             w = np.ravel(svc_model.coef_)
             b = float(svc_model.intercept_[0]) if hasattr(svc_model, 'intercept_') else 0.0
             decisions = grid_orig.dot(w) + b
@@ -180,15 +158,12 @@ def run_pairwise_hard_30d(n_features=30, try_kernels=False, random_state=42):
     except Exception as e:
         out_pca_png = None
 
-    # weight magnitudes bar chart (only for linear models)
     out_weights_png = None
     try:
         if svc_model is not None and hasattr(svc_model, 'coef_'):
             w = np.ravel(svc_model.coef_)
             abs_w = np.abs(w)
-            # show top 30 weights
-            num_show = min(len(abs_w), 30)
-            idx_sorted = np.argsort(-abs_w)[:num_show]
+            idx_sorted = np.argsort(-abs_w)[:min(len(abs_w), 30)]
             fe_names = used_feature_names[:len(abs_w)] if 'used_feature_names' in locals() else [f'feat{i}' for i in range(len(abs_w))]
             labels = [fe_names[i] for i in idx_sorted]
             vals = abs_w[idx_sorted]
@@ -203,7 +178,6 @@ def run_pairwise_hard_30d(n_features=30, try_kernels=False, random_state=42):
     except Exception:
         out_weights_png = None
 
-    # signed distance histogram
     out_dist_png = None
     try:
         if svc_model is not None and hasattr(svc_model, 'coef_'):
@@ -221,10 +195,8 @@ def run_pairwise_hard_30d(n_features=30, try_kernels=False, random_state=42):
     except Exception:
         out_dist_png = None
 
-    # summary main PNG (if PCA produced one use that, else fallback)
     out_main_png = out_pca_png or out_weights_png or out_dist_png
     if out_main_png is None:
-        # minimal placeholder
         out_main_png = os.path.join(RESULTS_DIR, f'breast_hard_{tag}.png')
         fig, ax = plt.subplots(1,1,figsize=(6,5))
         ax.text(0.5,0.5,'No visualization available',ha='center')
@@ -235,6 +207,5 @@ def run_pairwise_hard_30d(n_features=30, try_kernels=False, random_state=42):
 
 
 if __name__ == '__main__':
-    # control via environment variables if needed
     try_k = bool(int(os.environ.get('TRY_KERNELS','0')))
     run_pairwise_hard_30d(n_features=30, try_kernels=try_k)

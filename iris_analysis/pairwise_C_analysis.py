@@ -1,12 +1,3 @@
-"""
-Run C study for Iris pairwise soft-margin SVMs
-- Trains linear SVM for each pair and each C value
-- Saves per-pair per-C decision-boundary plots (2D only), and per-pair charts:
-  C vs accuracy, C vs #support vectors, C vs margin
-- Writes a summary CSV with an explanation column
-Usage:
-  SVM_C_VALUES="0.01,0.1,1,10" python pairwise_C_analysis.py
-"""
 import os
 import sys
 import json
@@ -52,7 +43,6 @@ def compute_margin_from_coef(coef):
 
 
 def plot_decision_boundary_fallback(model, X, y, title, out_path):
-    # fallback contour using decision_function
     xx, yy = np.meshgrid(np.linspace(X[:,0].min()-1, X[:,0].max()+1, 300),
                          np.linspace(X[:,1].min()-1, X[:,1].max()+1, 300))
     grid = np.c_[xx.ravel(), yy.ravel()]
@@ -113,7 +103,6 @@ def run(csv_path, features=('PetalLengthCm', 'PetalWidthCm')):
             supports.append(n_support if n_support is not None else math.nan)
             margins.append(margin if margin is not None else math.nan)
 
-            # save per-pair per-C plot
             out_png = os.path.join(RESULTS_DIR, f'iris_pair_{a}_vs_{b}_C_{str(C).replace(".","p")}.png')
             title = f'Iris pair {a} vs {b} (C={C})'
             if SVMVisualizer is not None:
@@ -146,7 +135,6 @@ def run(csv_path, features=('PetalLengthCm', 'PetalWidthCm')):
                 'explanation': explanation
             })
 
-        # per-pair charts: accuracy, support, margin vs C
         try:
             xs = C_values
             plt.figure(figsize=(6,4))
@@ -181,7 +169,6 @@ def run(csv_path, features=('PetalLengthCm', 'PetalWidthCm')):
         except Exception:
             pass
 
-    # write summary CSV
     out_csv = os.path.join(RESULTS_DIR, 'iris_pairwise_C_study_summary.csv')
     df = pd.DataFrame(rows)
     df.to_csv(out_csv, index=False)

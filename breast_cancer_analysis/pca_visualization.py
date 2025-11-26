@@ -1,19 +1,3 @@
-"""
-PCA Visualization for Breast Cancer (30D)
-- PCA -> 2D and 3D projections
-- Fit a "hard" linear SVM (LinearSVC with very large C) and a soft linear SVM (SVC kernel='linear', C=1.0)
-- Project decision function to PCA 2D plane by inverse-transforming a grid and evaluating w·x + b (or decision_function)
-- Save plots:
-  - 2D PCA scatter + hard vs soft decision boundaries (contours)
-  - 3D PCA scatter (showing overlap)
-  - weight magnitudes bar chart
-- Writes a small JSON report stating whether hard-margin was feasible on training data in 30D and on PCA-2D projection.
-
-Usage:
-  python pca_visualization.py
-Optional env vars:
-  SOFT_C (float), HARD_C (float), N_FEATURES (int)
-"""
 import os
 import json
 import numpy as np
@@ -101,18 +85,15 @@ def run(n_features=30, soft_C=1.0, hard_C=1e6, random_state=42):
     plt.figure(figsize=(8, 6))
     cmap = plt.get_cmap('bwr')
     plt.scatter(Xtr_p2[:, 0], Xtr_p2[:, 1], c=y_tr, cmap=cmap, edgecolor='k', s=40, alpha=0.8)
-    # plot margin contours for soft model (levels -1, 0, +1)
     try:
         cs_soft = plt.contour(xx, yy, Z_soft, levels=[-1, 0, 1], colors=['gray','k','gray'], linestyles=['--','-','--'], linewidths=[1.0,2.0,1.0], alpha=0.9)
     except Exception:
         cs_soft = plt.contour(xx, yy, Z_soft, levels=[0], colors='k', linestyles='-', linewidths=2, alpha=0.9)
     try:
-        # label central decision boundary
         cs_soft.collections[len(cs_soft.levels)//2].set_label(f'soft C={soft_C}')
     except Exception:
         pass
 
-    # plot soft support vectors projected to PCA space (if available)
     try:
         if hasattr(soft_model, 'support_'):
             sv = X_tr[soft_model.support_]
@@ -121,7 +102,6 @@ def run(n_features=30, soft_C=1.0, hard_C=1e6, random_state=42):
     except Exception:
         pass
 
-    # plot hard model contour and approximate support points (if hard model exists)
     if Z_hard is not None and hard_feasible_30d:
         try:
             cs_hard = plt.contour(xx, yy, Z_hard, levels=[-1, 0, 1], colors=['lightgreen','green','lightgreen'], linestyles=['--','-','--'], linewidths=[1.0,2.0,1.0], alpha=0.9)
@@ -134,13 +114,11 @@ def run(n_features=30, soft_C=1.0, hard_C=1e6, random_state=42):
                 cs_hard = plt.contour(xx, yy, Z_hard, levels=[0], colors='green', linestyles='--', linewidths=2, alpha=0.9)
             except Exception:
                 cs_hard = None
-        # approximate hard support points (LinearSVC does not expose support_)
         try:
             if hard_model is not None and hasattr(hard_model, 'coef_'):
                 w_h = np.ravel(hard_model.coef_)
                 b_h = float(hard_model.intercept_[0]) if hasattr(hard_model, 'intercept_') else 0.0
                 scores_h = X_tr.dot(w_h) + b_h
-                # find points near margin lines (|score|-1 small)
                 tol = max(0.05, 0.02 * np.std(scores_h))
                 mask_h = np.abs(np.abs(scores_h) - 1.0) <= tol
                 if mask_h.any():

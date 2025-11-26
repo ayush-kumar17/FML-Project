@@ -1,9 +1,3 @@
-"""
-Pairwise Hard-Margin SVM analysis for Breast Cancer dataset
-Attempts strict hard-margin by accepting a linear SVM only if training split is perfectly separable.
-If linear infeasible, tries kernel tricks (poly2, poly3, rbf) with very large C.
-Outputs saved to drestcanceranalysis/results/
-"""
 import os
 import sys
 import json
@@ -17,7 +11,6 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 
-# Ensure parent project dir on path
 PARENT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PARENT_DIR not in sys.path:
     sys.path.insert(0, PARENT_DIR)
@@ -49,11 +42,9 @@ def run_pairwise_hard(feature_idx=(0, 1), random_state=42):
     X = X_full[:, [fi0, fi1]]
     fname = f"{feature_names[fi0]}__{feature_names[fi1]}".replace(' ', '_')
 
-    # Scale features for numerical stability and faster convergence
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
 
-    # Use a fast LinearSVC pre-check
     X_tr_check, X_te_check, y_tr_check, y_te_check = train_test_split(X, y, test_size=0.3, random_state=random_state, stratify=y)
     fast_linear = LinearSVC(C=1e6, max_iter=20000, tol=1e-4, dual=False, random_state=random_state)
     fast_linear.fit(X_tr_check, y_tr_check)
@@ -64,12 +55,10 @@ def run_pairwise_hard(feature_idx=(0, 1), random_state=42):
     kernel_params = None
 
     if train_acc_fast == 1.0:
-        # Accept linear solution from LinearSVC (fast)
         svc_hard = fast_linear
         kernel_used = 'linear (LinearSVC)'
         kernel_params = {}
         infeasible = False
-        # compute margin (LinearSVC stores coef_)
         margin = compute_margin_from_coef(fast_linear.coef_)
         sv = None
         y_pred = fast_linear.predict(X_te_check)
@@ -81,7 +70,6 @@ def run_pairwise_hard(feature_idx=(0, 1), random_state=42):
         }
         X_tr, X_te, y_tr, y_te = X_tr_check, X_te_check, y_tr_check, y_te_check
     else:
-        # Fall back to bounded SVC attempts on scaled data
         X_tr, X_te, y_tr, y_te = X_tr_check, X_te_check, y_tr_check, y_te_check
         svc_hard = SVC(kernel='linear', C=1e6, tol=1e-3, max_iter=10000, cache_size=500)
         svc_hard.fit(X_tr, y_tr)
@@ -96,7 +84,6 @@ def run_pairwise_hard(feature_idx=(0, 1), random_state=42):
                 {'kernel': 'rbf', 'gamma': 'scale', 'C': 1e4}
             ]
 
-            # GPU SVM detection: try cuML (preferred), then ThunderSVM
             GPU_AVAILABLE = False
             USE_CUML = False
             USE_THUNDERSVM = False
@@ -116,9 +103,7 @@ def run_pairwise_hard(feature_idx=(0, 1), random_state=42):
                     GPU_AVAILABLE = False
 
             for cand in kernel_candidates:
-                # Prefer GPU implementations when available
                 if GPU_AVAILABLE and USE_CUML:
-                    # cuML requires float32 and cupy arrays
                     try:
                         X_tr_dev = cp.asarray(X_tr.astype('float32'))
                         y_tr_dev = cp.asarray(y_tr.astype('int32'))
@@ -129,11 +114,9 @@ def run_pairwise_hard(feature_idx=(0, 1), random_state=42):
                         svc_k.fit(X_tr_dev, y_tr_dev)
                         y_tr_pred_k = cp.asnumpy(svc_k.predict(X_tr_dev)).astype(int)
                     except Exception as e:
-                        # GPU attempt failed; fallback to CPU sklearn
                         svc_k = None
                         y_tr_pred_k = np.array([])
                 elif GPU_AVAILABLE and USE_THUNDERSVM:
-                    # Use ThunderSVM on CPU/GPU build (fits numpy arrays)
                     try:
                         svc_k = thSVC(kernel=cand['kernel'], C=cand.get('C', 1e4))
                         svc_k.fit(X_tr.astype('float32'), y_tr.astype('int32'))
@@ -142,7 +125,6 @@ def run_pairwise_hard(feature_idx=(0, 1), random_state=42):
                         svc_k = None
                         y_tr_pred_k = np.array([])
                 else:
-                    # CPU sklearn fallback with bounded settings
                     if cand['kernel'] == 'poly':
                         svc_k = SVC(kernel='poly', degree=cand['degree'], C=cand['C'], gamma='scale', tol=1e-3, max_iter=10000, cache_size=500)
                     else:
@@ -201,11 +183,9 @@ def run_pairwise_hard(feature_idx=(0, 1), random_state=42):
     out_png = os.path.join(RESULTS_DIR, f'breast_hard_features_{fi0}_{fi1}.png')
     fig, ax = plt.subplots(1, 1, figsize=(6,5))
     if not infeasible and svc_hard is not None:
-        # If LinearSVC used, convert to SVC-like interface for plotting if needed
         try:
             SVMVisualizer.plot_decision_boundary(svc_hard, X_tr, y_tr, title=f'Hard ({kernel_used}) {fname}', ax=ax)
         except Exception:
-            # fallback plotting for LinearSVC
             xx, yy = np.meshgrid(np.linspace(X_tr[:,0].min()-1, X_tr[:,0].max()+1, 300),
                                  np.linspace(X_tr[:,1].min()-1, X_tr[:,1].max()+1, 300))
             grid = np.c_[xx.ravel(), yy.ravel()]
