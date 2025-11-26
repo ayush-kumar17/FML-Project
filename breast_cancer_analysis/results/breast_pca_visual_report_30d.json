@@ -1,0 +1,13 @@
+{
+  "n_features": 30,
+  "hard_train_acc_30d": 1.0,
+  "hard_feasible_30d": true,
+  "soft_train_acc_30d": 0.9899497487437185,
+  "pca2_train_acc_linear_on_projection": 0.957286432160804,
+  "pca2_separable": false,
+  "plots": {
+    "pca2_decision_png": "breast_pca2d_softC_1.0_hardC_1000000.png",
+    "pca3_scatter_png": "breast_pca3d_30d.png",
+    "weights_png": "breast_weight_magnitudes_hard.png"
+  }
+}
